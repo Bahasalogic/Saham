@@ -285,19 +285,27 @@ function openForm() {
     <label>Catatan<input id="f_cat"></label>
     <div class="btns"><button onclick="dlg.close()">Batal</button><button class="ok" onclick="simpanDiv()">Simpan</button></div>`
   : `<h3>Catat transaksi</h3>
-    <label>Jenis<select id="f_jenis"><option>Beli</option><option>Jual</option></select></label>
+    <label>Jenis<select id="f_jenis" onchange="$('#f_biaya').value=this.value==='Jual'?0.25:0.15;prevFee()"><option>Beli</option><option>Jual</option></select></label>
     <label>Tanggal<input id="f_tgl" type="date" value="${today()}"></label>
     <label>Pemilik<select id="f_own">${own}</select></label>
     <label>Kode saham<input id="f_kode" placeholder="BBCA" autocapitalize="characters"></label>
-    <label>Jumlah (lot)<input id="f_lot" type="number" inputmode="numeric"></label>
-    <label>Harga per lembar<input id="f_harga" type="number" inputmode="decimal"></label>
-    <label>Biaya (fee + pajak)<input id="f_biaya" type="number" inputmode="decimal" value="0"></label>
+    <label>Jumlah (lot)<input id="f_lot" type="number" inputmode="numeric" oninput="prevFee()"></label>
+    <label>Harga per lembar<input id="f_harga" type="number" inputmode="decimal" oninput="prevFee()"></label>
+    <label>Fee + pajak (% dari nilai transaksi)<input id="f_biaya" type="number" inputmode="decimal" step="0.01" value="0.15" oninput="prevFee()"><small id="f_prev"></small></label>
     <label>Catatan<input id="f_cat"></label>
     <div class="btns"><button onclick="dlg.close()">Batal</button><button class="ok" onclick="simpanTx()">Simpan</button></div>`;
   dlg.showModal();
 }
 async function kirim(sheet, row) {
   try { await api({action: 'add', sheet, row}); dlg.close(); toast('Tersimpan'); load(); } catch (e) { toast(e.message); }
+}
+function biayaRp() {
+  const nilai = (Number(v('f_lot')) || 0) * 100 * (Number(v('f_harga')) || 0);
+  return Math.round(nilai * (Number(v('f_biaya')) || 0) / 100);
+}
+function prevFee() {
+  const nilai = (Number(v('f_lot')) || 0) * 100 * (Number(v('f_harga')) || 0);
+  $('#f_prev').textContent = nilai ? `Nilai ${rp(nilai)} · fee ${rp(biayaRp())}` : 'Isi lot dan harga untuk melihat fee dalam rupiah';
 }
 function simpanTx() {
   const kode = v('f_kode').toUpperCase(), lot = Number(v('f_lot')), harga = Number(v('f_harga'));
@@ -307,7 +315,7 @@ function simpanTx() {
     const h = holdings().find(x => x.own === own && x.kode === kode);
     if (!h || h.sh < lembar) return toast(`${own} hanya punya ${h ? h.sh / 100 : 0} lot ${kode}`);
   }
-  kirim('Transaksi', {Tanggal: v('f_tgl'), Jenis: jenis, Pemilik: own, Kode: kode, Lembar: lembar, Harga: harga, Biaya: Number(v('f_biaya')) || 0, Catatan: v('f_cat')});
+  kirim('Transaksi', {Tanggal: v('f_tgl'), Jenis: jenis, Pemilik: own, Kode: kode, Lembar: lembar, Harga: harga, Biaya: biayaRp(), Catatan: v('f_cat')});
 }
 function simpanDiv() {
   const kode = v('f_kode').toUpperCase(), tot = Number(v('f_tot'));
