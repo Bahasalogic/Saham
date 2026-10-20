@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f3d3e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Catatan Saham</title>
+<style>
+:root{--bg:#f3f6f5;--card:#fff;--ink:#14282a;--mute:#5f7476;--line:#dbe4e2;--main:#0f6b66;--up:#0a7d4b;--down:#b3372f;--nav:#0f3d3e}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1819;--card:#142526;--ink:#e6f0ee;--mute:#92a9a7;--line:#25393a;--main:#4cc2b6;--up:#4cd28e;--down:#ff8a80;--nav:#091213}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:84px}
+header{position:sticky;top:0;background:var(--nav);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;gap:8px;align-items:center;z-index:5}
+header h1{font-size:17px;margin:0;flex:1}
+select,input,button{font:inherit;color:var(--ink)}
+header select{background:#ffffff22;color:#fff;border:0;border-radius:8px;padding:6px 8px}
+header select option{color:#000}
+header button{background:#ffffff22;border:0;border-radius:8px;padding:6px 9px;color:#fff}
+main{padding:12px;max-width:640px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.card h3{margin:0 0 8px;font-size:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid small,.k{display:block;color:var(--mute);font-size:12px}
+.up{color:var(--up)}.down{color:var(--down)}
+.big{font-size:20px;font-weight:700}
+.row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row small{color:var(--mute)}
+.r{text-align:right}
+.hold summary{list-style:none;cursor:pointer}
+.hold summary::-webkit-details-marker{display:none}
+.hold .top{display:flex;justify-content:space-between;align-items:baseline}
+.hold .tx{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:13px;color:var(--mute)}
+.note{color:var(--mute);font-size:12px;margin:2px 2px 10px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--nav);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;background:none;border:0;color:#9db8b5;padding:12px 0;font-size:13px}
+nav button.on{color:#fff;font-weight:600;box-shadow:inset 0 3px 0 #4cc2b6}
+.fab{position:fixed;right:14px;bottom:calc(70px + env(safe-area-inset-bottom));background:var(--main);color:#fff;border:0;border-radius:28px;padding:12px 18px;font-weight:600;z-index:6;box-shadow:0 3px 10px #0004}
+dialog{border:0;border-radius:14px;background:var(--card);color:var(--ink);width:min(92vw,420px);padding:16px}
+dialog::backdrop{background:#0008}
+label{display:block;font-size:13px;color:var(--mute);margin-top:10px}
+input,dialog select{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btns button,.menu button{flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
+.btns .ok{background:var(--main);color:#fff;border:0;font-weight:600}
+.menu{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.del{background:none;border:0;color:var(--down);font-size:12px;padding:0}
+.empty{color:var(--mute);text-align:center;padding:28px 10px}
+#msg{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:8px;z-index:200;display:none}
+#lock{position:fixed;inset:0;background:var(--nav);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.lbox{width:min(100%,320px);display:flex;flex-direction:column;gap:10px;color:#fff;text-align:center}
+.lbox h2{margin:0}
+.lbox p{margin:0;color:#b9d0cd;min-height:22px}
+.lbox input{text-align:center;font-size:22px;letter-spacing:6px;background:#ffffff18;color:#fff;border:1px solid #ffffff33}
+.lbox button{padding:12px;border-radius:8px;border:0;background:#4cc2b6;color:#06201f;font-weight:700}
+.lbox .lnk{background:none;color:#b9d0cd;font-weight:400;padding:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Catatan Saham</h1>
+  <select id="who"></select>
+  <button id="bLock" aria-label="Kunci">🔒</button>
+  <button id="bSet" aria-label="Pengaturan">⚙</button>
+</header>
+<main id="app"></main>
+<button class="fab" id="fab">+ Transaksi</button>
+<nav id="nav">
+  <button data-t="ring" class="on">Ringkasan</button>
+  <button data-t="port">Portofolio</button>
+  <button data-t="tx">Transaksi</button>
+  <button data-t="div">Dividen</button>
+</nav>
+<dialog id="dlg"></dialog>
+<div id="msg"></div>
+
+<div id="lock"><div class="lbox">
+  <h2>Catatan Saham</h2>
+  <p id="lmsg"></p>
+  <input id="lpin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="PIN">
+  <input id="lpin2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ulangi PIN">
+  <button id="lbtn">Buka</button>
+  <button id="lforgot" class="lnk">Lupa PIN</button>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const rp = n => (n < 0 ? '-' : '') + 'Rp' + Math.round(Math.abs(n)).toLocaleString('id-ID');
+const pct = n => (n >= 0 ? '+' : '') + n.toFixed(2).replace('.', ',') + '%';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cls = n => (n >= 0 ? 'up' : 'down');
+const today = () => new Date().toLocaleDateString('sv-SE');
+let cfg = null, D = {tx: [], div: [], own: [], hg: {}}, tab = 'ring', who = 'Semua', started = false;
+try { cfg = JSON.parse(localStorage.getItem('cfg')); } catch (e) {}
+
+function toast(t) { const m = $('#msg'); m.textContent = t; m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500); }
+
+// ---------- Kunci aplikasi ----------
+async function sha(s) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('saham:' + s));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function showLock() {
+  const has = !!localStorage.getItem('lockh');
+  $('#lock').style.display = 'flex';
+  $('#lpin2').style.display = has ? 'none' : 'block';
+  $('#lmsg').textContent = has ? 'Masukkan PIN untuk membuka' : 'Buat PIN kunci (4–6 angka)';
+  $('#lbtn').textContent = has ? 'Buka' : 'Simpan PIN';
+  $('#lforgot').style.display = has ? 'block' : 'none';
+  $('#lpin').value = ''; $('#lpin2').value = '';
+  setTimeout(() => $('#lpin').focus(), 50);
+}
+function unlock() {
+  $('#lock').style.display = 'none';
+  if (!started) { started = true; cfg ? load() : setup(); } else load();
+}
+$('#lbtn').onclick = async () => {
+  const p = $('#lpin').value, has = localStorage.getItem('lockh');
+  if (has) {
+    if (await sha(p) === has) unlock();
+    else { $('#lmsg').textContent = 'PIN salah, coba lagi'; $('#lpin').value = ''; }
+  } else {
+    if (!/^\d{4,6}$/.test(p)) { $('#lmsg').textContent = 'PIN harus 4–6 angka'; return; }
+    if (p !== $('#lpin2').value) { $('#lmsg').textContent = 'Kedua PIN tidak sama'; return; }
+    localStorage.setItem('lockh', await sha(p));
+    unlock();
+  }
+};
+$('#lpin').onkeydown = $('#lpin2').onkeydown = e => { if (e.key === 'Enter') $('#lbtn').click(); };
+$('#lforgot').onclick = () => {
+  const s = prompt('Untuk reset PIN kunci, masukkan PIN server (yang ada di Code.gs):');
+  if (s && cfg && s === cfg.pin) { localStorage.removeItem('lockh'); showLock(); }
+  else if (s !== null) toast('PIN server salah');
+};
+$('#bLock').onclick = showLock;
+let away = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) away = Date.now();
+  else if (localStorage.getItem('lockh') && Date.now() - away > 30000) showLock();
+});
+
+// ---------- Data ----------
+async function api(body) {
+  const r = await fetch(cfg.url, {method: 'POST', body: JSON.stringify({...body, token: cfg.pin})});
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return j;
+}
+async function load() {
+  try {
+    const r = await fetch(cfg.url + '?token=' + encodeURIComponent(cfg.pin));
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    D = j;
+    const s = $('#who');
+    s.innerHTML = ['Semua', ...D.own].map(o => `<option>${esc(o)}</option>`).join('');
+    s.value = D.own.includes(who) ? who : (who = 'Semua');
+    render();
+  } catch (e) {
+    $('#app').innerHTML = `<div class="empty">Gagal memuat: ${esc(e.message)}<br><br><button onclick="setup()">Atur koneksi</button></div>`;
+  }
+}
+function setup() {
+  const url = prompt('Tempel URL Web App dari Apps Script:', cfg?.url || '');
+  if (!url) return;
+  const pin = prompt('PIN server (sama dengan di Code.gs):', cfg?.pin || '');
+  if (!pin) return;
+  cfg = {url: url.trim(), pin: pin.trim()};
+  localStorage.setItem('cfg', JSON.stringify(cfg));
+  load();
+}
+
+// ---------- Perhitungan ----------
+const byDate = (a, b) => a.Tanggal < b.Tanggal ? -1 : a.Tanggal > b.Tanggal ? 1 : a.ID - b.ID;
+
+function holdings(upTo) {
+  const m = {};
+  D.tx.filter(t => !upTo || t.Tanggal <= upTo).sort(byDate).forEach(t => {
+    const h = m[t.Pemilik + '|' + t.Kode] ??= {own: t.Pemilik, kode: t.Kode, sh: 0, cost: 0, real: 0};
+    const n = Number(t.Lembar), p = Number(t.Harga), f = Number(t.Biaya) || 0;
+    if (t.Jenis === 'Beli') { h.sh += n; h.cost += n * p + f; }
+    else {
+      const avg = h.sh ? h.cost / h.sh : 0;
+      h.real += n * p - f - avg * n;
+      h.cost -= avg * n; h.sh -= n;
+    }
+  });
+  return Object.values(m);
+}
+function dividendParts() {
+  return D.div.slice().sort(byDate).map(d => {
+    const hs = holdings(d.Tanggal).filter(h => h.kode === d.Kode && h.sh > 0);
+    const tot = hs.reduce((a, h) => a + h.sh, 0);
+    return {d, parts: tot ? hs.map(h => ({own: h.own, amt: Number(d.Total) * h.sh / tot, sh: h.sh})) : []};
+  });
+}
+function ringkas(owners, H, DP) {
+  const hs = H.filter(h => owners.includes(h.own) && h.sh > 0);
+  const priced = hs.filter(h => D.hg[h.kode]);
+  const modal = hs.reduce((a, h) => a + h.cost, 0);
+  const nilai = priced.reduce((a, h) => a + D.hg[h.kode] * h.sh, 0);
+  const modalP = priced.reduce((a, h) => a + h.cost, 0);
+  const float = nilai - modalP;
+  const real = H.filter(h => owners.includes(h.own)).reduce((a, h) => a + h.real, 0);
+  const dv = DP.reduce((a, x) => a + x.parts.filter(p => owners.includes(p.own)).reduce((b, p) => b + p.amt, 0), 0);
+  return {modal, nilai, float, floatPct: modalP ? float / modalP * 100 : 0, real, dv, total: float + real + dv, tanpaHarga: hs.length - priced.length};
+}
+
+// ---------- Tampilan ----------
+const inWho = o => who === 'Semua' || o === who;
+
+function kartu(judul, r) {
+  return `<div class="card"><h3>${esc(judul)}</h3>
+    <div class="grid">
+      <div><small>Nilai sekarang</small><span class="big">${rp(r.nilai)}</span></div>
+      <div><small>Untung/rugi belum terjual</small><span class="big ${cls(r.float)}">${rp(r.float)}</span><small class="${cls(r.float)}">${pct(r.floatPct)}</small></div>
+      <div><small>Modal tertanam</small>${rp(r.modal)}</div>
+      <div><small>Dividen diterima</small>${rp(r.dv)}</div>
+      <div><small>Laba/rugi sudah terjual</small><span class="${cls(r.real)}">${rp(r.real)}</span></div>
+      <div><small>Total keseluruhan</small><b class="${cls(r.total)}">${rp(r.total)}</b></div>
+    </div>${r.tanpaHarga ? `<div class="note">${r.tanpaHarga} saham belum ada harga sekarang, tidak dihitung di nilai.</div>` : ''}</div>`;
+}
+
+function render() {
+  const el = $('#app'), H = holdings(), DP = dividendParts();
+  if (tab === 'ring') {
+    const owners = who === 'Semua' ? D.own : [who];
+    let h = '';
+    if (who === 'Semua' && owners.length > 1) h += kartu('Gabungan semua', ringkas(owners, H, DP));
+    h += owners.map(o => kartu(o, ringkas([o], H, DP))).join('');
+    el.innerHTML = h || '<div class="empty">Belum ada pemilik.</div>';
+  }
+  if (tab === 'port') {
+    const hs = H.filter(h => h.sh > 0 && inWho(h.own)).sort((a, b) => a.own.localeCompare(b.own) || a.kode.localeCompare(b.kode));
+    el.innerHTML = hs.length ? hs.map(h => {
+      const px = D.hg[h.kode], nilai = px ? px * h.sh : null, pl = px ? nilai - h.cost : null;
+      const log = D.tx.filter(t => t.Pemilik === h.own && t.Kode === h.kode).sort(byDate).reverse()
+        .map(t => `<div>${t.Tanggal} · ${t.Jenis} ${t.Lembar / 100} lot @ ${rp(t.Harga)}</div>`).join('');
+      return `<details class="card hold"><summary>
+        <div class="top"><b>${esc(h.kode)}</b><span>${h.sh / 100} lot · ${esc(h.own)}</span></div>
+        <div class="grid" style="margin-top:6px">
+          <div><small>Harga beli rata-rata</small>${rp(h.cost / h.sh)}</div>
+          <div><small>Harga sekarang</small>${px ? rp(px) : '<span class="down">belum ada</span>'}</div>
+          <div><small>Modal</small>${rp(h.cost)}</div>
+          <div><small>Nilai sekarang</small>${px ? rp(nilai) : '-'}</div>
+        </div>
+        <div style="margin-top:8px"><small class="k">Untung/rugi belum terjual</small>
+          ${px ? `<b class="${cls(pl)}">${rp(pl)} (${pct(pl / h.cost * 100)})</b>` : '-'}</div>
+        </summary><div class="tx">${log}</div></details>`;
+    }).join('') + '<div class="note">Ketuk kartu untuk melihat riwayat beli/jual saham tersebut. Harga dari GOOGLEFINANCE bisa tertunda ±20 menit.</div>'
+      : '<div class="empty">Belum ada saham dipegang.<br>Tekan “+ Transaksi” untuk mulai.</div>';
+  }
+  if (tab === 'tx') {
+    const l = D.tx.filter(t => inWho(t.Pemilik)).sort(byDate).reverse();
+    el.innerHTML = l.length ? `<div class="card">${l.map(t => `<div class="row"><div><b class="${t.Jenis === 'Beli' ? 'up' : 'down'}">${t.Jenis}</b> ${esc(t.Kode)}<br><small>${t.Tanggal} · ${esc(t.Pemilik)}${t.Catatan ? ' · ' + esc(t.Catatan) : ''}</small></div>
+      <div class="r">${t.Lembar / 100} lot @ ${rp(t.Harga)}<br><button class="del" onclick="hapus('Transaksi',${t.ID})">Hapus</button></div></div>`).join('')}</div>`
+      : '<div class="empty">Belum ada transaksi.</div>';
+  }
+  if (tab === 'div') {
+    const l = DP.slice().reverse().filter(x => who === 'Semua' || x.parts.some(p => p.own === who) || !x.parts.length);
+    el.innerHTML = l.length ? l.map(x => `<div class="card"><div class="row"><div><b>${esc(x.d.Kode)}</b><br><small>${x.d.Tanggal}${x.d.Catatan ? ' · ' + esc(x.d.Catatan) : ''}</small></div>
+      <div class="r">${rp(x.d.Total)}<br><button class="del" onclick="hapus('Dividen',${x.d.ID})">Hapus</button></div></div>
+      ${x.parts.length ? x.parts.map(p => `<div class="row"><small>${esc(p.own)} (${p.sh / 100} lot)</small><span>${rp(p.amt)}</span></div>`).join('')
+        : '<div class="row"><small class="down">Tidak ada yang memegang saham ini pada tanggal tersebut.</small></div>'}</div>`).join('')
+      : '<div class="empty">Belum ada dividen dicatat.</div>';
+  }
+}
+async function hapus(sheet, id) {
+  if (!confirm('Hapus catatan ini?')) return;
+  try { await api({action: 'delete', sheet, id}); toast('Dihapus'); load(); } catch (e) { toast(e.message); }
+}
+
+// ---------- Form ----------
+const dlg = $('#dlg');
+const v = id => $('#' + id).value.trim();
+function openForm() {
+  const isDiv = tab === 'div';
+  const own = D.own.map(o => `<option ${o === who ? 'selected' : ''}>${esc(o)}</option>`).join('');
+  dlg.innerHTML = isDiv ? `<h3>Catat dividen</h3>
+    <label>Tanggal<input id="f_tgl" type="date" value="${today()}"></label>
+    <label>Kode saham<input id="f_kode" placeholder="BBCA" autocapitalize="characters"></label>
+    <label>Total diterima (setelah pajak)<input id="f_tot" type="number" inputmode="decimal"></label>
+    <label>Catatan<input id="f_cat"></label>
+    <div class="btns"><button onclick="dlg.close()">Batal</button><button class="ok" onclick="simpanDiv()">Simpan</button></div>`
+  : `<h3>Catat transaksi</h3>
+    <label>Jenis<select id="f_jenis"><option>Beli</option><option>Jual</option></select></label>
+    <label>Tanggal<input id="f_tgl" type="date" value="${today()}"></label>
+    <label>Pemilik<select id="f_own">${own}</select></label>
+    <label>Kode saham<input id="f_kode" placeholder="BBCA" autocapitalize="characters"></label>
+    <label>Jumlah (lot)<input id="f_lot" type="number" inputmode="numeric"></label>
+    <label>Harga per lembar<input id="f_harga" type="number" inputmode="decimal"></label>
+    <label>Biaya (fee + pajak)<input id="f_biaya" type="number" inputmode="decimal" value="0"></label>
+    <label>Catatan<input id="f_cat"></label>
+    <div class="btns"><button onclick="dlg.close()">Batal</button><button class="ok" onclick="simpanTx()">Simpan</button></div>`;
+  dlg.showModal();
+}
+async function kirim(sheet, row) {
+  try { await api({action: 'add', sheet, row}); dlg.close(); toast('Tersimpan'); load(); } catch (e) { toast(e.message); }
+}
+function simpanTx() {
+  const kode = v('f_kode').toUpperCase(), lot = Number(v('f_lot')), harga = Number(v('f_harga'));
+  if (!kode || !lot || !harga) return toast('Lengkapi kode, lot, dan harga');
+  const jenis = v('f_jenis'), own = v('f_own'), lembar = lot * 100;
+  if (jenis === 'Jual') {
+    const h = holdings().find(x => x.own === own && x.kode === kode);
+    if (!h || h.sh < lembar) return toast(`${own} hanya punya ${h ? h.sh / 100 : 0} lot ${kode}`);
+  }
+  kirim('Transaksi', {Tanggal: v('f_tgl'), Jenis: jenis, Pemilik: own, Kode: kode, Lembar: lembar, Harga: harga, Biaya: Number(v('f_biaya')) || 0, Catatan: v('f_cat')});
+}
+function simpanDiv() {
+  const kode = v('f_kode').toUpperCase(), tot = Number(v('f_tot'));
+  if (!kode || !tot) return toast('Lengkapi kode dan total');
+  kirim('Dividen', {Tanggal: v('f_tgl'), Kode: kode, Total: tot, Catatan: v('f_cat')});
+}
+
+// ---------- Pengaturan & event ----------
+$('#bSet').onclick = () => {
+  dlg.innerHTML = `<h3>Pengaturan</h3><div class="menu">
+    <button onclick="dlg.close();load();toast('Memuat ulang…')">Muat ulang data & harga</button>
+    <button onclick="dlg.close();localStorage.removeItem('lockh');showLock()">Ganti PIN kunci</button>
+    <button onclick="dlg.close();setup()">Atur koneksi Google Sheet</button>
+    <button onclick="dlg.close()">Tutup</button></div>`;
+  dlg.showModal();
+};
+function fab() {
+  const f = $('#fab');
+  f.style.display = tab === 'ring' ? 'none' : 'block';
+  f.textContent = tab === 'div' ? '+ Dividen' : '+ Transaksi';
+}
+$('#nav').onclick = e => {
+  const t = e.target.dataset.t; if (!t) return;
+  tab = t;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  fab(); render();
+};
+$('#who').onchange = e => { who = e.target.value; render(); };
+$('#fab').onclick = () => { if (tab === 'port') tab = 'tx'; openForm(); };
+fab();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+showLock();
+</script>
+</body>
+</html>
