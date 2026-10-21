@@ -1,6 +1,6 @@
 {
-  "name": "Catatan Saham",
-  "short_name": "Saham",
+  "name": "Saham Saya",
+  "short_name": "Saham Saya",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
