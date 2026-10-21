@@ -56,6 +56,20 @@ input,dialog select{width:100%;padding:9px;border:1px solid var(--line);border-r
 .lbox input{text-align:center;font-size:22px;letter-spacing:6px;background:#ffffff18;color:#fff;border:1px solid #ffffff33}
 .lbox button{padding:12px;border-radius:8px;border:0;background:#4cc2b6;color:#06201f;font-weight:700}
 .lbox .lnk{background:none;color:#b9d0cd;font-weight:400;padding:6px}
+.del.ed{color:var(--main);margin-right:12px}
+dialog.wide{width:min(96vw,640px);max-height:92vh;overflow:auto}
+textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.imp{border:1px solid var(--line);border-radius:10px;padding:8px;margin-top:8px}
+.imp.warn{border-color:var(--down)}
+.imp .ih{display:flex;justify-content:space-between;align-items:center}
+.imp .ck{display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)}
+.imp .ck input{width:auto}
+.ig{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.ig input,.ig select{padding:6px;font-size:13px;min-width:0}
+.ig select{grid-column:1/-1}
+button.ok.full{width:100%;padding:12px;margin-top:12px;border-radius:8px;background:var(--main);color:#fff;border:0;font-weight:600}
+button.ok:disabled{opacity:.5}
 </style>
 </head>
 <body>
@@ -63,6 +77,7 @@ input,dialog select{width:100%;padding:9px;border:1px solid var(--line);border-r
   <h1>Catatan Saham</h1>
   <select id="who"></select>
   <button id="bLock" aria-label="Kunci">🔒</button>
+  <button id="bImp" aria-label="Impor laporan">📥</button>
   <button id="bSet" aria-label="Pengaturan">⚙</button>
 </header>
 <main id="app"></main>
@@ -135,6 +150,7 @@ $('#lforgot').onclick = () => {
   else if (s !== null) toast('PIN server salah');
 };
 $('#bLock').onclick = showLock;
+$('#bImp').onclick = openImport;
 let away = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) away = Date.now();
@@ -255,13 +271,13 @@ function render() {
   if (tab === 'tx') {
     const l = D.tx.filter(t => inWho(t.Pemilik)).sort(byDate).reverse();
     el.innerHTML = l.length ? `<div class="card">${l.map(t => `<div class="row"><div><b class="${t.Jenis === 'Beli' ? 'up' : 'down'}">${t.Jenis}</b> ${esc(t.Kode)}<br><small>${t.Tanggal} · ${esc(t.Pemilik)}${t.Catatan ? ' · ' + esc(t.Catatan) : ''}</small></div>
-      <div class="r">${t.Lembar / 100} lot @ ${rp(t.Harga)}<br><button class="del" onclick="hapus('Transaksi',${t.ID})">Hapus</button></div></div>`).join('')}</div>`
+      <div class="r">${t.Lembar / 100} lot @ ${rp(t.Harga)}<br><button class="del ed" onclick="editRec('Transaksi',${t.ID})">Ubah</button><button class="del" onclick="hapus('Transaksi',${t.ID})">Hapus</button></div></div>`).join('')}</div>`
       : '<div class="empty">Belum ada transaksi.</div>';
   }
   if (tab === 'div') {
     const l = DP.slice().reverse().filter(x => who === 'Semua' || x.parts.some(p => p.own === who) || !x.parts.length);
     el.innerHTML = l.length ? l.map(x => `<div class="card"><div class="row"><div><b>${esc(x.d.Kode)}</b><br><small>${x.d.Tanggal}${x.d.Catatan ? ' · ' + esc(x.d.Catatan) : ''}</small></div>
-      <div class="r">${rp(x.d.Total)}<br><button class="del" onclick="hapus('Dividen',${x.d.ID})">Hapus</button></div></div>
+      <div class="r">${rp(x.d.Total)}<br><button class="del ed" onclick="editRec('Dividen',${x.d.ID})">Ubah</button><button class="del" onclick="hapus('Dividen',${x.d.ID})">Hapus</button></div></div>
       ${x.parts.length ? x.parts.map(p => `<div class="row"><small>${esc(p.own)} (${p.sh / 100} lot)</small><span>${rp(p.amt)}</span></div>`).join('')
         : '<div class="row"><small class="down">Tidak ada yang memegang saham ini pada tanggal tersebut.</small></div>'}</div>`).join('')
       : '<div class="empty">Belum ada dividen dicatat.</div>';
@@ -275,52 +291,227 @@ async function hapus(sheet, id) {
 // ---------- Form ----------
 const dlg = $('#dlg');
 const v = id => $('#' + id).value.trim();
-function openForm() {
-  const isDiv = tab === 'div';
-  const own = D.own.map(o => `<option ${o === who ? 'selected' : ''}>${esc(o)}</option>`).join('');
-  dlg.innerHTML = isDiv ? `<h3>Catat dividen</h3>
-    <label>Tanggal<input id="f_tgl" type="date" value="${today()}"></label>
-    <label>Kode saham<input id="f_kode" placeholder="BBCA" autocapitalize="characters"></label>
-    <label>Total diterima (setelah pajak)<input id="f_tot" type="number" inputmode="decimal"></label>
-    <label>Catatan<input id="f_cat"></label>
-    <div class="btns"><button onclick="dlg.close()">Batal</button><button class="ok" onclick="simpanDiv()">Simpan</button></div>`
-  : `<h3>Catat transaksi</h3>
-    <label>Jenis<select id="f_jenis" onchange="$('#f_biaya').value=this.value==='Jual'?0.25:0.15;prevFee()"><option>Beli</option><option>Jual</option></select></label>
-    <label>Tanggal<input id="f_tgl" type="date" value="${today()}"></label>
-    <label>Pemilik<select id="f_own">${own}</select></label>
-    <label>Kode saham<input id="f_kode" placeholder="BBCA" autocapitalize="characters"></label>
-    <label>Jumlah (lot)<input id="f_lot" type="number" inputmode="numeric" oninput="prevFee()"></label>
-    <label>Harga per lembar<input id="f_harga" type="number" inputmode="decimal" oninput="prevFee()"></label>
-    <label>Fee + pajak (% dari nilai transaksi)<input id="f_biaya" type="number" inputmode="decimal" step="0.01" value="0.15" oninput="prevFee()"><small id="f_prev"></small></label>
-    <label>Catatan<input id="f_cat"></label>
-    <div class="btns"><button onclick="dlg.close()">Batal</button><button class="ok" onclick="simpanTx()">Simpan</button></div>`;
+const NEWOWN = '__new__';
+let editing = null, feeMode = 'pct', IMP = {rows: [], skip: 0};
+dlg.addEventListener('close', () => { editing = null; dlg.classList.remove('wide'); });
+function closeForm() { dlg.close(); }
+
+function ownOpts(sel, blank = 'Pilih pemilik…') {
+  return `<option value="">${blank}</option>` + D.own.map(o => `<option value="${esc(o)}" ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('') + `<option value="${NEWOWN}">➕ Tambah pemilik baru…</option>`;
+}
+async function ownChange(el) {
+  if (el.value !== NEWOWN) { el.dataset.prev = el.value; return; }
+  let nama = (prompt('Nama pemilik baru:') || '').trim();
+  if (!nama) { el.value = el.dataset.prev || ''; return; }
+  const ada = D.own.find(o => o.toLowerCase() === nama.toLowerCase());
+  if (ada) nama = ada;
+  else {
+    try { await api({action: 'add', sheet: 'Pemilik', row: {Nama: nama}}); D.own.push(nama); }
+    catch (e) { toast(e.message); el.value = el.dataset.prev || ''; return; }
+  }
+  document.querySelectorAll('dialog select.own').forEach(s => {
+    const cur = s === el ? nama : s.value;
+    s.innerHTML = ownOpts(cur, s.dataset.blank || undefined); s.value = cur;
+  });
+  el.dataset.prev = nama;
+  const w = $('#who'); w.innerHTML = ['Semua', ...D.own].map(o => `<option>${esc(o)}</option>`).join(''); w.value = who;
+}
+
+const nilaiTx = () => (Number(v('f_lot')) || 0) * 100 * (Number(v('f_harga')) || 0);
+function feeFromPct() { $('#f_feerp').value = Math.round(nilaiTx() * (Number(v('f_fee')) || 0) / 100) || ''; }
+function feeFromRp() { const n = nilaiTx(); $('#f_fee').value = n ? Number((Number(v('f_feerp')) / n * 100).toFixed(4)) : ''; }
+function nilaiChanged() { feeMode === 'pct' ? feeFromPct() : feeFromRp(); }
+function jenisChanged() { if (editing) return; $('#f_fee').value = v('f_jenis') === 'Jual' ? 0.25 : 0.15; feeMode = 'pct'; feeFromPct(); }
+
+function editRec(sheet, id) {
+  editing = (sheet === 'Dividen' ? D.div : D.tx).find(x => String(x.ID) === String(id));
+  openForm(sheet);
+}
+function openForm(sheet) {
+  const isDiv = (sheet || (tab === 'div' ? 'Dividen' : 'Transaksi')) === 'Dividen';
+  const e = editing, ttl = e ? 'Ubah' : 'Catat';
+  if (isDiv) {
+    dlg.innerHTML = `<h3>${ttl} dividen</h3>
+    <label>Tanggal<input id="f_tgl" type="date" value="${e ? e.Tanggal : today()}"></label>
+    <label>Kode saham<input id="f_kode" value="${e ? esc(e.Kode) : ''}" placeholder="BBCA" autocapitalize="characters"></label>
+    <label>Total diterima (setelah pajak)<input id="f_tot" type="number" inputmode="decimal" value="${e ? e.Total : ''}"></label>
+    <label>Catatan<input id="f_cat" value="${e ? esc(e.Catatan) : ''}"></label>
+    <div class="btns"><button onclick="closeForm()">Batal</button><button class="ok" onclick="simpanDiv()">Simpan</button></div>`;
+  } else {
+    const nil = e ? e.Lembar * e.Harga : 0;
+    feeMode = e ? 'rp' : 'pct';
+    dlg.innerHTML = `<h3>${ttl} transaksi</h3>
+    <label>Jenis<select id="f_jenis" onchange="jenisChanged()"><option ${e && e.Jenis === 'Beli' ? 'selected' : ''}>Beli</option><option ${e && e.Jenis === 'Jual' ? 'selected' : ''}>Jual</option></select></label>
+    <label>Tanggal<input id="f_tgl" type="date" value="${e ? e.Tanggal : today()}"></label>
+    <label>Pemilik<select id="f_own" class="own" onchange="ownChange(this)">${ownOpts(e ? e.Pemilik : (who !== 'Semua' ? who : ''))}</select></label>
+    <label>Kode saham<input id="f_kode" value="${e ? esc(e.Kode) : ''}" placeholder="BBCA" autocapitalize="characters"></label>
+    <div class="two"><label>Jumlah (lot)<input id="f_lot" type="number" inputmode="numeric" value="${e ? e.Lembar / 100 : ''}" oninput="nilaiChanged()"></label>
+    <label>Harga per lembar<input id="f_harga" type="number" inputmode="decimal" value="${e ? e.Harga : ''}" oninput="nilaiChanged()"></label></div>
+    <div class="two"><label>Fee + pajak (%)<input id="f_fee" type="number" step="0.0001" inputmode="decimal" value="${e ? (nil ? Number((e.Biaya / nil * 100).toFixed(4)) : 0) : 0.15}" oninput="feeMode='pct';feeFromPct()"></label>
+    <label>Fee (Rp)<input id="f_feerp" type="number" inputmode="decimal" value="${e ? e.Biaya : ''}" oninput="feeMode='rp';feeFromRp()"></label></div>
+    <label>Catatan<input id="f_cat" value="${e ? esc(e.Catatan) : ''}"></label>
+    <div class="btns"><button onclick="closeForm()">Batal</button><button class="ok" onclick="simpanTx()">Simpan</button></div>`;
+  }
   dlg.showModal();
 }
-async function kirim(sheet, row) {
-  try { await api({action: 'add', sheet, row}); dlg.close(); toast('Tersimpan'); load(); } catch (e) { toast(e.message); }
-}
-function biayaRp() {
-  const nilai = (Number(v('f_lot')) || 0) * 100 * (Number(v('f_harga')) || 0);
-  return Math.round(nilai * (Number(v('f_biaya')) || 0) / 100);
-}
-function prevFee() {
-  const nilai = (Number(v('f_lot')) || 0) * 100 * (Number(v('f_harga')) || 0);
-  $('#f_prev').textContent = nilai ? `Nilai ${rp(nilai)} · fee ${rp(biayaRp())}` : 'Isi lot dan harga untuk melihat fee dalam rupiah';
+async function simpan(sheet, row) {
+  try {
+    if (editing) await api({action: 'update', sheet, id: editing.ID, row});
+    else await api({action: 'add', sheet, row});
+    closeForm(); toast('Tersimpan'); load();
+  } catch (e) { toast(e.message); }
 }
 function simpanTx() {
-  const kode = v('f_kode').toUpperCase(), lot = Number(v('f_lot')), harga = Number(v('f_harga'));
+  const kode = v('f_kode').toUpperCase(), lot = Number(v('f_lot')), harga = Number(v('f_harga')), own = v('f_own'), jenis = v('f_jenis'), lembar = lot * 100;
+  if (!own) return toast('Pilih pemilik dulu');
   if (!kode || !lot || !harga) return toast('Lengkapi kode, lot, dan harga');
-  const jenis = v('f_jenis'), own = v('f_own'), lembar = lot * 100;
   if (jenis === 'Jual') {
-    const h = holdings().find(x => x.own === own && x.kode === kode);
+    const asli = D.tx; D.tx = asli.filter(t => !editing || t.ID !== editing.ID);
+    const h = holdings().find(x => x.own === own && x.kode === kode); D.tx = asli;
     if (!h || h.sh < lembar) return toast(`${own} hanya punya ${h ? h.sh / 100 : 0} lot ${kode}`);
   }
-  kirim('Transaksi', {Tanggal: v('f_tgl'), Jenis: jenis, Pemilik: own, Kode: kode, Lembar: lembar, Harga: harga, Biaya: biayaRp(), Catatan: v('f_cat')});
+  simpan('Transaksi', {Tanggal: v('f_tgl'), Jenis: jenis, Pemilik: own, Kode: kode, Lembar: lembar, Harga: harga, Biaya: Number(v('f_feerp')) || 0, Catatan: v('f_cat')});
 }
 function simpanDiv() {
   const kode = v('f_kode').toUpperCase(), tot = Number(v('f_tot'));
   if (!kode || !tot) return toast('Lengkapi kode dan total');
-  kirim('Dividen', {Tanggal: v('f_tgl'), Kode: kode, Total: tot, Catatan: v('f_cat')});
+  simpan('Dividen', {Tanggal: v('f_tgl'), Kode: kode, Total: tot, Catatan: v('f_cat')});
+}
+
+// ---------- Impor laporan broker ----------
+const BLN = {jan: 0, feb: 1, mar: 2, apr: 3, may: 4, mei: 4, jun: 5, jul: 6, aug: 7, agu: 7, sep: 8, oct: 9, okt: 9, nov: 10, dec: 11, des: 11};
+
+function parseLaporan(text) {
+  text = text.replace(/[|•·_]+/g, ' ');
+  const re = /(Buy|Sell|Beli|Jual|DIV|Dividen|IPO|Refund|Deposit|Withdraw)\s+(?:([A-Za-z][A-Za-z0-9]{2,5})\s+)?(\d[\d.,]*)\s+(\d[\d.,]*|[-—–])\s+(\d[\d.,]*|[-—–])\s+(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/gi;
+  const n = s => /^\d/.test(s) ? Number(s.replace(/[.,]/g, '')) : 0;
+  const rows = []; let skip = 0, m;
+  while ((m = re.exec(text))) {
+    const a = m[1].toLowerCase(), kode = (m[2] || '').toUpperCase(), mo = BLN[m[7].slice(0, 3).toLowerCase()];
+    if (mo === undefined) continue;
+    const tgl = `${m[8]}-${String(mo + 1).padStart(2, '0')}-${m[6].padStart(2, '0')}`;
+    const net = n(m[3]), qty = n(m[4]), px = n(m[5]);
+    if (['deposit', 'refund', 'withdraw'].includes(a)) { skip++; continue; }
+    if (!kode) continue;
+    if (a === 'div' || a === 'dividen') { rows.push({jenis: 'Dividen', tgl, kode, tot: net, note: 'Impor broker', ok: true}); continue; }
+    if (!qty || !px) continue;
+    const gross = qty * 100 * px, jual = a === 'sell' || a === 'jual', fee = jual ? gross - net : net - gross;
+    rows.push({jenis: jual ? 'Jual' : 'Beli', tgl, kode, lot: qty, harga: px, fee: Math.max(0, fee), own: '', note: a === 'ipo' ? 'IPO' : 'Impor broker', ok: true, warn: fee < 0 || fee > gross * 0.01});
+  }
+  if (rows.length > 1 && rows[0].tgl >= rows[rows.length - 1].tgl) rows.reverse();
+  rows.sort((a, b) => a.tgl < b.tgl ? -1 : a.tgl > b.tgl ? 1 : 0);
+  rows.forEach(r => {
+    r.dup = r.jenis === 'Dividen'
+      ? D.div.some(d => d.Tanggal === r.tgl && d.Kode === r.kode && Number(d.Total) === r.tot)
+      : D.tx.some(t => t.Tanggal === r.tgl && t.Jenis === r.jenis && t.Kode === r.kode && Number(t.Lembar) === r.lot * 100 && Number(t.Harga) === r.harga);
+    if (r.dup) r.ok = false;
+  });
+  return {rows, skip};
+}
+
+function prepImg(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = img.width < 1400 ? 2 : 1, c = document.createElement('canvas');
+      c.width = img.width * sc; c.height = img.height * sc;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height);
+      const d = g.getImageData(0, 0, c.width, c.height), p = d.data, L = new Float32Array(c.width * c.height);
+      let sum = 0;
+      for (let i = 0, j = 0; i < p.length; i += 4, j++) { L[j] = .299 * p[i] + .587 * p[i + 1] + .114 * p[i + 2]; sum += L[j]; }
+      const mean = sum / L.length, dark = mean < 128;
+      for (let i = 0, j = 0; i < p.length; i += 4, j++) {
+        const ink = dark ? L[j] > mean + 35 : L[j] < mean - 35;
+        p[i] = p[i + 1] = p[i + 2] = ink ? 0 : 255; p[i + 3] = 255;
+      }
+      g.putImageData(d, 0, 0); URL.revokeObjectURL(img.src); res(c.toDataURL('image/png'));
+    };
+    img.onerror = () => rej(new Error('Gambar tidak bisa dibuka'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Gagal memuat OCR, cek internet')); document.head.appendChild(s); });
+}
+async function ocrImage(file) {
+  if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+  const img = await prepImg(file);
+  const w = await Tesseract.createWorker('eng', 1, {logger: m => { if (m.status === 'recognizing text') $('#imp_st').textContent = 'Membaca gambar… ' + Math.round(m.progress * 100) + '%'; }});
+  await w.setParameters({tessedit_pageseg_mode: '6', preserve_interword_spaces: '1'});
+  const {data} = await w.recognize(img); await w.terminate();
+  return data.text;
+}
+
+function openImport() {
+  editing = null; dlg.classList.add('wide');
+  dlg.innerHTML = `<h3>Impor laporan broker</h3>
+    <div class="note">Unggah tangkapan layar riwayat transaksi atau tempel teksnya. Buy/Sell/IPO jadi transaksi, DIV jadi dividen, Deposit dan Refund diabaikan. Hasil bisa dicek dan diubah dulu sebelum disimpan.</div>
+    <label>Screenshot laporan<input id="imp_file" type="file" accept="image/*"></label>
+    <label>…atau tempel teks<textarea id="imp_txt" rows="4" placeholder="Buy MBMA 153,230 3 510 15 Sep 2026"></textarea></label>
+    <div id="imp_st" class="note"></div><div id="imp_out"></div>
+    <div class="btns"><button onclick="closeForm()">Tutup</button><button class="ok" id="imp_go" onclick="impRead()">Baca laporan</button></div>`;
+  dlg.showModal();
+}
+async function impRead() {
+  const st = $('#imp_st'), go = $('#imp_go'); go.disabled = true; st.style.color = '';
+  try {
+    let text = $('#imp_txt').value; const f = $('#imp_file').files[0];
+    if (f) { st.textContent = 'Menyiapkan OCR (pertama kali agak lama)…'; text = (await ocrImage(f)) + '\n' + text; }
+    if (!text.trim()) throw new Error('Pilih gambar atau tempel teks dulu');
+    IMP = parseLaporan(text); st.textContent = '';
+    if (!IMP.rows.length) throw new Error('Tidak ada baris transaksi terbaca. Coba gambar lebih tajam atau tempel teksnya.');
+    impRender();
+  } catch (e) { st.textContent = e.message; st.style.color = 'var(--down)'; }
+  go.disabled = false;
+}
+function impRender() {
+  $('#imp_out').innerHTML = `<div class="note">${IMP.rows.length} baris terbaca${IMP.skip ? `, ${IMP.skip} baris Deposit/Refund diabaikan` : ''}. Baris yang sudah ada di data tidak dicentang.</div>
+    <label>Pemilik untuk semua transaksi beli/jual<select id="imp_own" class="own" onchange="ownChange(this)">${ownOpts(who !== 'Semua' ? who : '')}</select></label>
+    ${IMP.rows.map(impRow).join('')}<div id="imp_sum"></div>
+    <button class="ok full" id="imp_save" onclick="impSave()">Simpan</button>`;
+  impSum();
+}
+function impRow(r, i) {
+  const dv = r.jenis === 'Dividen';
+  return `<div class="imp ${r.warn ? 'warn' : ''}"><div class="ih"><label class="ck"><input type="checkbox" ${r.ok ? 'checked' : ''} onchange="impSet(${i},'ok',this.checked)"> <b class="${r.jenis === 'Beli' ? 'up' : r.jenis === 'Jual' ? 'down' : ''}">${r.jenis}</b></label>
+    <small class="down">${r.dup ? 'sudah ada' : ''}${r.warn ? ' cek fee' : ''}</small></div>
+    <div class="ig"><input type="date" value="${r.tgl}" onchange="impSet(${i},'tgl',this.value)">
+    <input value="${esc(r.kode)}" oninput="impSet(${i},'kode',this.value.toUpperCase())">
+    ${dv ? `<input type="number" value="${r.tot}" placeholder="Total" oninput="impSet(${i},'tot',+this.value)">`
+      : `<input type="number" value="${r.lot}" placeholder="Lot" oninput="impSet(${i},'lot',+this.value)">
+    <input type="number" value="${r.harga}" placeholder="Harga" oninput="impSet(${i},'harga',+this.value)">
+    <input type="number" value="${r.fee}" placeholder="Fee Rp" oninput="impSet(${i},'fee',+this.value)">
+    <select class="own" data-blank="Ikut pilihan atas" onchange="ownChange(this).then(()=>impSet(${i},'own',this.value))">${ownOpts(r.own, 'Ikut pilihan atas')}</select>`}
+    </div></div>`;
+}
+function impSet(i, k, val) { IMP.rows[i][k] = val; impSum(); }
+function impSum() {
+  const rows = IMP.rows.filter(r => r.ok), by = {};
+  rows.forEach(r => {
+    const o = by[r.kode] ??= {lot: 0, beli: 0, jual: 0, dv: 0};
+    if (r.jenis === 'Dividen') o.dv += r.tot;
+    else { const n = r.lot * 100 * r.harga; if (r.jenis === 'Beli') { o.lot += r.lot; o.beli += n + r.fee; } else { o.lot -= r.lot; o.jual += n - r.fee; } }
+  });
+  const ks = Object.keys(by).sort();
+  $('#imp_sum').innerHTML = ks.length ? '<div class="k" style="margin-top:10px">Akumulasi per saham (baris tercentang)</div>' + ks.map(k => `<div class="row"><b>${esc(k)}</b><small class="r">${by[k].lot} lot bersih · beli ${rp(by[k].beli)} · jual ${rp(by[k].jual)}${by[k].dv ? ' · dividen ' + rp(by[k].dv) : ''}</small></div>`).join('') : '';
+  $('#imp_save').textContent = `Simpan ${rows.length} baris`; $('#imp_save').disabled = !rows.length;
+}
+async function impSave() {
+  const g = v('imp_own'), tx = [], dv = [];
+  for (const r of IMP.rows.filter(r => r.ok)) {
+    if (!r.kode || !r.tgl) return toast('Ada baris tanpa kode/tanggal');
+    if (r.jenis === 'Dividen') { if (!r.tot) return toast('Total dividen ' + r.kode + ' kosong'); dv.push({Tanggal: r.tgl, Kode: r.kode, Total: r.tot, Catatan: r.note}); continue; }
+    const own = r.own || g;
+    if (!own) return toast('Pilih pemilik (di atas atau per baris)');
+    if (!r.lot || !r.harga) return toast('Lot/harga ' + r.kode + ' kosong');
+    tx.push({Tanggal: r.tgl, Jenis: r.jenis, Pemilik: own, Kode: r.kode, Lembar: r.lot * 100, Harga: r.harga, Biaya: r.fee || 0, Catatan: r.note});
+  }
+  $('#imp_save').disabled = true;
+  try {
+    if (tx.length) await api({action: 'addMany', sheet: 'Transaksi', rows: tx});
+    if (dv.length) await api({action: 'addMany', sheet: 'Dividen', rows: dv});
+    closeForm(); toast(`${tx.length} transaksi & ${dv.length} dividen tersimpan`); load();
+  } catch (e) { toast(e.message); $('#imp_save').disabled = false; }
 }
 
 // ---------- Pengaturan & event ----------
@@ -328,10 +519,18 @@ $('#bSet').onclick = () => {
   dlg.innerHTML = `<h3>Pengaturan</h3><div class="menu">
     <button onclick="dlg.close();load();toast('Memuat ulang…')">Muat ulang data & harga</button>
     <button onclick="dlg.close();localStorage.removeItem('lockh');showLock()">Ganti PIN kunci</button>
+    <button onclick="dlg.close();buatAkun()">Buat/ubah akun pemantau (untuk adik)</button>
     <button onclick="dlg.close();setup()">Atur koneksi Google Sheet</button>
     <button onclick="dlg.close()">Tutup</button></div>`;
   dlg.showModal();
 };
+async function buatAkun() {
+  const owner = (prompt('Akun untuk pemilik siapa? Ketik persis salah satu: ' + D.own.join(', ')) || '').trim();
+  if (!D.own.includes(owner)) return toast('Nama pemilik tidak ada');
+  const username = prompt('Username untuk ' + owner + ' (huruf kecil, tanpa spasi):'); if (!username) return;
+  const sandi = prompt('Sandi (minimal 6 karakter):'); if (!sandi) return;
+  try { await api({action: 'akun', username, sandi, pemilik: owner}); toast('Akun tersimpan'); } catch (e) { toast(e.message); }
+}
 function fab() {
   const f = $('#fab');
   f.style.display = tab === 'ring' ? 'none' : 'block';
