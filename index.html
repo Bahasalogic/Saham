@@ -111,6 +111,9 @@ dialog[open]{animation:in .2s ease both}
 .seg button{flex:1;border:0;background:none;padding:9px;border-radius:9px;font:inherit;color:var(--mute);cursor:pointer}
 .seg .on{background:var(--main);color:#fff;font-weight:600}
 .axis{display:flex;justify-content:space-between;font-size:11px;color:var(--mute)}
+.bagi{width:100%;padding:12px;margin-bottom:10px;border-radius:12px;border:1px dashed var(--main);background:transparent;color:var(--main);font:inherit;font-weight:600;cursor:pointer}
+.bar{display:flex;gap:8px;margin-bottom:10px}.bar .bagi{margin:0;width:auto;flex:1;font-size:13px;padding:11px 6px}
+.gh{font-size:13px;margin:16px 2px 8px;color:var(--mute);font-weight:600}
 </style>
 </head>
 <body>
@@ -266,7 +269,8 @@ function ringkas(owners, H, DP) {
   const float = nilai - modalP;
   const real = H.filter(h => owners.includes(h.own)).reduce((a, h) => a + h.real, 0);
   const dv = DP.reduce((a, x) => a + x.parts.filter(p => owners.includes(p.own)).reduce((b, p) => b + p.amt, 0), 0);
-  return {modal, nilai, float, floatPct: modalP ? float / modalP * 100 : 0, real, dv, total: float + real + dv, tanpaHarga: hs.length - priced.length,
+  const jl = D.tx.filter(t => owners.includes(t.Pemilik) && t.Jenis === 'Jual' && !isPindah(t)).reduce((a, t) => a + t.Lembar * t.Harga - (Number(t.Biaya) || 0), 0);
+  return {jual: jl, masuk: jl + dv, modal, nilai, float, floatPct: modalP ? float / modalP * 100 : 0, real, dv, total: float + real + dv, tanpaHarga: hs.length - priced.length,
     items: Object.values(hs.reduce((m, h) => { const x = m[h.kode] ??= {l: h.kode, v: 0}; x.v += D.hg[h.kode] ? D.hg[h.kode] * h.sh : h.cost; return m; }, {})),
     lst: Object.values(hs.reduce((m, h) => { const x = m[h.kode] ??= {kode: h.kode, sh: 0, cost: 0}; x.sh += h.sh; x.cost += h.cost; return m; }, {}))};
 }
@@ -295,6 +299,8 @@ function daftarAvg(l) {
   return `<div class="k" style="margin-top:14px">Saham dipegang · avg (rata-rata harga beli)</div>` + l.map(x => `<div class="row"><b>${esc(x.kode)}</b><small class="r">${x.sh / 100} lot · avg ${rp(x.cost / x.sh)}</small></div>`).join('');
 }
 
+const isPindah = t => String(t.Catatan || '').startsWith('Pindah');
+const lbl = t => isPindah(t) ? (t.Jenis === 'Jual' ? 'Pindah keluar' : 'Pindah masuk') : t.Jenis;
 let kt = 'trade';
 const fmtTgl = t => new Date(t).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: '2-digit'});
 function gauge(wr, n) {
@@ -322,7 +328,7 @@ function kinerja(tx, divs, now, kt, again) {
     else {
       const avg = h.sh ? h.cost / h.sh : 0, basis = avg * n, pl = n * p - f - basis;
       h.cost -= basis; h.sh -= n; modal -= basis;
-      T.push({tm, kode: t.Kode, pl, basis, pct: basis ? pl / basis * 100 : 0}); cum += pl; real.push({t: tm, v: cum});
+      if (!isPindah(t)) { T.push({tm, kode: t.Kode, pl, basis, pct: basis ? pl / basis * 100 : 0}); cum += pl; real.push({t: tm, v: cum}); }
     }
     kurva.push({t: tm, v: modal});
   });
@@ -351,7 +357,7 @@ function kinerja(tx, divs, now, kt, again) {
   return seg + `<div class="card"><div class="top"><div><small>Win rate</small><span class="big ${cls(wr - 50)}">${wr.toFixed(2).replace('.', ',')}%</span>
       <small style="margin-top:10px">Profit factor</small><span class="big">${gl ? pf.toFixed(2).replace('.', ',') : (gp ? '∞' : '-')}</span></div>
       <div style="text-align:center">${gauge(wr, T.length)}<div class="grid"><div><b class="up">${W.length}</b><small>Menang</small></div><div><b class="down">${L.length}</b><small>Kalah</small></div></div></div></div></div>
-    <div class="grid"><div class="card"><small>Total nilai transaksi</small><b>${rp(sum(tx.map(t => t.Lembar * t.Harga)))}</b></div><div class="card"><small>Total order</small><b>${tx.length}</b></div>
+    <div class="grid"><div class="card"><small>Total nilai transaksi</small><b>${rp(sum(tx.filter(t => !isPindah(t)).map(t => t.Lembar * t.Harga)))}</b></div><div class="card"><small>Total order</small><b>${tx.filter(t => !isPindah(t)).length}</b></div>
       <div class="card"><small>Profit terbesar</small><b class="up">${mp ? rp(mp.pl) : '-'}</b><small>${mp ? pct(mp.pct) + ' · ' + esc(mp.kode) : ''}</small></div>
       <div class="card"><small>Rugi terbesar</small><b class="down">${ml ? rp(ml.pl) : '-'}</b><small>${ml ? pct(ml.pct) + ' · ' + esc(ml.kode) : ''}</small></div>
       <div class="card"><small>Rata-rata profit</small><b class="up">${W.length ? rp(gp / W.length) : '-'}</b></div>
@@ -372,10 +378,17 @@ function kartu(judul, r, extra = '') {
       <div><small>Dividen diterima</small>${rp(r.dv)}</div>
       <div><small>Laba/rugi sudah terjual</small><span class="${cls(r.real)}">${rp(r.real)}</span></div>
       <div><small>Total keseluruhan</small><b class="${cls(r.total)}">${rp(r.total)}</b></div>
+      <div><small>Uang hasil jual</small>${rp(r.jual)}</div>
+      <div><small>Total uang masuk (jual + dividen)</small><b class="up">${rp(r.masuk)}</b></div>
     </div>${donut(r.items, 'Komposisi saham')}${daftarAvg(r.lst)}${extra}${r.tanpaHarga ? `<div class="note">${r.tanpaHarga} saham belum ada harga sekarang, tidak dihitung di nilai.</div>` : ''}</div>`;
 }
 
 function render() {
+  renderIsi();
+  if (tab === 'tx' || tab === 'port') $('#app').insertAdjacentHTML('afterbegin', '<div class="bar"><button class="bagi" onclick="openBagi()">➗ Bagi beli/jual</button><button class="bagi" onclick="openPindah()">🔁 Pindahkan kepemilikan</button></div>');
+}
+function renderIsi() {
+  _lo = null;
   const el = $('#app'), H = holdings(), DP = dividendParts();
   const open = new Set(H.filter(h => h.sh > 0).map(h => h.own + '|' + h.kode)), openKode = new Set(H.filter(h => h.sh > 0).map(h => h.kode));
   if (tab === 'kin') {
@@ -397,7 +410,7 @@ function render() {
       const px = D.hg[h.kode], nilai = px ? px * h.sh : null, pl = px ? nilai - h.cost : null;
       const log = D.tx.filter(t => t.Pemilik === h.own && t.Kode === h.kode).sort(byDate).reverse()
         .map(t => `<div>${t.Tanggal} · ${t.Jenis} ${t.Lembar / 100} lot @ ${rp(t.Harga)}</div>`).join('');
-      return `<details class="card hold"><summary>
+      return grupHdr(h, hs) + `<details class="card hold"><summary>
         <div class="top"><b>${esc(h.kode)}</b><span>${h.sh / 100} lot · ${esc(h.own)}</span></div>
         <div class="grid" style="margin-top:6px">
           <div><small>Avg (harga beli rata-rata)</small>${rp(h.cost / h.sh)}</div>
@@ -415,7 +428,7 @@ function render() {
   if (tab === 'tx') {
     const semua = D.tx.filter(t => inWho(t.Pemilik)).sort(byDate).reverse();
     const l = semua.filter(t => showClosed || open.has(t.Pemilik + '|' + t.Kode)), sembunyi = semua.length - l.length;
-    el.innerHTML = l.length ? `<div class="card">${l.map(t => `<div class="row"><div><b class="${t.Jenis === 'Beli' ? 'up' : 'down'}">${t.Jenis}</b> ${esc(t.Kode)}<br><small>${t.Tanggal} · ${esc(t.Pemilik)}${t.Catatan ? ' · ' + esc(t.Catatan) : ''}</small></div>
+    el.innerHTML = l.length ? `<div class="card">${l.map(t => `<div class="row"><div><b class="${t.Jenis === 'Beli' ? 'up' : 'down'}">${lbl(t)}</b> ${esc(t.Kode)}<br><small>${t.Tanggal} · ${esc(t.Pemilik)}${t.Catatan ? ' · ' + esc(t.Catatan) : ''}</small></div>
       <div class="r">${t.Lembar / 100} lot @ ${rp(t.Harga)}<br><button class="del ed" onclick="editRec('Transaksi',${t.ID})">Ubah</button><button class="del" onclick="hapus('Transaksi',${t.ID})">Hapus</button></div></div>`).join('')}</div>`
       : '<div class="empty">Belum ada transaksi.</div>';
     if (sembunyi) el.innerHTML += `<div class="note">${sembunyi} transaksi saham yang sudah terjual disembunyikan. Buka ⚙ untuk menampilkan.</div>`;
@@ -526,6 +539,107 @@ function simpanDiv() {
   const kode = v('f_kode').toUpperCase(), tot = Number(v('f_tot'));
   if (!kode || !tot) return toast('Lengkapi kode dan total');
   simpan('Dividen', {Tanggal: v('f_tgl'), Kode: kode, Total: tot, Catatan: v('f_cat')});
+}
+
+// ---------- Bagi kepemilikan ----------
+function openBagi() {
+  editing = null;
+  dlg.innerHTML = `<h3>Bagi kepemilikan saham</h3>
+  <div class="note">Satu transaksi dibagi ke beberapa pemilik sekaligus. Fee dibagi sebanding jumlah lot.</div>
+  <div class="two"><label>Jenis<select id="b_jenis" onchange="$('#b_fee').value=this.value==='Jual'?0.25:0.15"><option>Beli</option><option>Jual</option></select></label>
+  <label>Tanggal<input id="b_tgl" type="date" value="${today()}"></label></div>
+  <div class="two"><label>Kode saham<input id="b_kode" placeholder="BBCA" autocapitalize="characters" oninput="bagiRows()"></label>
+  <label>Total lot<input id="b_lot" type="number" inputmode="numeric" oninput="bagiSum()"></label></div>
+  <div class="two"><label>Harga per lembar<input id="b_harga" type="number" inputmode="decimal"></label>
+  <label>Fee + pajak (%)<input id="b_fee" type="number" step="0.01" inputmode="decimal" value="0.15"></label></div>
+  <div class="k" style="margin-top:14px">Pembagian lot per pemilik</div><div id="b_rows"></div>
+  <div class="btns" style="margin-top:6px"><button onclick="bagiRata()">Bagi rata</button><button onclick="bagiBaru()">➕ Pemilik baru</button></div>
+  <div id="b_sum" class="note"></div>
+  <label>Catatan<input id="b_cat" placeholder="opsional"></label>
+  <div class="btns"><button onclick="closeForm()">Batal</button><button class="ok" onclick="simpanBagi()">Simpan</button></div>`;
+  bagiRows(); dlg.showModal();
+}
+function bagiRows() {
+  const keep = {}; document.querySelectorAll('#b_rows input').forEach(i => keep[i.dataset.o] = i.value);
+  $('#b_rows').innerHTML = D.own.map(o => `<div class="row"><div><b>${esc(o)}</b><small>${heldTxt(o)}</small></div><input type="number" inputmode="numeric" min="0" style="width:90px;text-align:right" data-o="${esc(o)}" value="${keep[o] || ''}" placeholder="0" oninput="bagiSum()"></div>`).join('');
+  bagiSum();
+}
+const bagiParts = () => [...document.querySelectorAll('#b_rows input')].map(i => ({own: i.dataset.o, lot: Number(i.value) || 0}));
+function bagiSum() {
+  const total = Number(v('b_lot')) || 0, p = bagiParts(), sum = p.reduce((a, x) => a + x.lot, 0), el = $('#b_sum');
+  el.style.color = total && sum !== total ? 'var(--down)' : '';
+  el.textContent = `Terbagi ${sum} dari ${total} lot` + (total ? ` · sisa ${total - sum}` : '') + (sum ? ' · ' + p.filter(x => x.lot).map(x => `${x.own} ${(x.lot / sum * 100).toFixed(0)}%`).join(', ') : '');
+}
+function bagiRata() {
+  const total = Number(v('b_lot')) || 0, ins = [...document.querySelectorAll('#b_rows input')], n = ins.length;
+  if (!total || !n) return toast('Isi total lot dulu');
+  ins.forEach((i, k) => i.value = Math.floor(total / n) + (k < total % n ? 1 : 0)); bagiSum();
+}
+async function bagiBaru() {
+  let nama = (prompt('Nama pemilik baru:') || '').trim(); if (!nama) return;
+  const ada = D.own.find(o => o.toLowerCase() === nama.toLowerCase());
+  if (!ada) { try { await api({action: 'add', sheet: 'Pemilik', row: {Nama: nama}}); D.own.push(nama); } catch (e) { return toast(e.message); } }
+  bagiRows();
+}
+async function simpanBagi() {
+  const kode = v('b_kode').toUpperCase(), total = Number(v('b_lot')), harga = Number(v('b_harga')), jenis = v('b_jenis'), tgl = v('b_tgl');
+  const parts = bagiParts().filter(x => x.lot > 0), sum = parts.reduce((a, x) => a + x.lot, 0);
+  if (!kode || !total || !harga) return toast('Lengkapi kode, total lot, dan harga');
+  if (sum !== total) return toast(`Pembagian ${sum} lot, harus ${total} lot`);
+  if (jenis === 'Jual') {
+    const H = holdings();
+    for (const x of parts) { const h = H.find(y => y.own === x.own && y.kode === kode); if (!h || h.sh < x.lot * 100) return toast(`${x.own} hanya punya ${h ? h.sh / 100 : 0} lot ${kode}`); }
+  }
+  const feeTot = Math.round(total * 100 * harga * (Number(v('b_fee')) || 0) / 100); let sisa = feeTot;
+  const rows = parts.map((x, i) => {
+    const f = i === parts.length - 1 ? sisa : Math.round(feeTot * x.lot / total); sisa -= f;
+    return {Tanggal: tgl, Jenis: jenis, Pemilik: x.own, Kode: kode, Lembar: x.lot * 100, Harga: harga, Biaya: f, Catatan: v('b_cat') || 'Dibagi'};
+  });
+  try { await api({action: 'addMany', sheet: 'Transaksi', rows}); closeForm(); toast(`Tersimpan untuk ${rows.length} pemilik`); load(); } catch (e) { toast(e.message); }
+}
+
+// ---------- Pindahkan kepemilikan ----------
+let _lo = null;
+function grupHdr(h, hs) {
+  if (who !== 'Semua' || h.own === _lo) return '';
+  _lo = h.own; const g = hs.filter(x => x.own === h.own);
+  return `<div class="gh">${esc(h.own)} · ${g.length} saham · ${g.reduce((a, x) => a + x.sh / 100, 0)} lot · modal ${rp(g.reduce((a, x) => a + x.cost, 0))}</div>`;
+}
+const heldTxt = o => { const k = v('b_kode').toUpperCase(); if (!k) return ''; const h = holdings().find(y => y.own === o && y.kode === k); return (h ? h.sh / 100 : 0) + ' lot dipegang'; };
+function openPindah() {
+  editing = null;
+  const adaOwn = [...new Set(holdings().filter(h => h.sh > 0).map(h => h.own))];
+  dlg.innerHTML = `<h3>Pindahkan kepemilikan</h3>
+  <div class="note">Memindahkan saham dari satu pemilik ke pemilik lain tanpa uang masuk/keluar. Modal ikut pindah sesuai harga rata-rata.</div>
+  <label>Dari pemilik<select id="p_dari" onchange="pindahKode()"><option value="">Pilih pemilik…</option>${adaOwn.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select></label>
+  <label>Saham<select id="p_kode" onchange="pindahInfo()"><option value="">Pilih pemilik dulu</option></select></label>
+  <div class="two"><label>Jumlah lot dipindah<input id="p_lot" type="number" inputmode="numeric"></label>
+  <label>Tanggal<input id="p_tgl" type="date" value="${today()}"></label></div>
+  <label>Ke pemilik<select id="p_ke" class="own" onchange="ownChange(this)">${ownOpts('')}</select></label>
+  <div id="p_info" class="note"></div>
+  <div class="btns"><button onclick="closeForm()">Batal</button><button class="ok" onclick="simpanPindah()">Pindahkan</button></div>`;
+  dlg.showModal();
+}
+function pindahKode() {
+  const o = v('p_dari'), hs = holdings().filter(h => h.own === o && h.sh > 0);
+  $('#p_kode').innerHTML = hs.length ? hs.map(h => `<option value="${esc(h.kode)}">${esc(h.kode)} — ${h.sh / 100} lot</option>`).join('') : '<option value="">Pilih pemilik dulu</option>';
+  pindahInfo();
+}
+function pindahInfo() {
+  const h = holdings().find(x => x.own === v('p_dari') && x.kode === v('p_kode'));
+  $('#p_info').textContent = h ? `Avg ${rp(h.cost / h.sh)} · modal ${rp(h.cost)} untuk ${h.sh / 100} lot` : '';
+}
+async function simpanPindah() {
+  const dari = v('p_dari'), ke = v('p_ke'), kode = v('p_kode'), lot = Number(v('p_lot')), tgl = v('p_tgl');
+  if (!dari || !ke || !kode || !lot) return toast('Lengkapi semua isian');
+  if (dari === ke) return toast('Pemilik asal dan tujuan sama');
+  const h = holdings().find(x => x.own === dari && x.kode === kode);
+  if (!h || h.sh < lot * 100) return toast(`${dari} hanya punya ${h ? h.sh / 100 : 0} lot ${kode}`);
+  const avg = Number((h.cost / h.sh).toFixed(6)), n = lot * 100;
+  const rows = [
+    {Tanggal: tgl, Jenis: 'Jual', Pemilik: dari, Kode: kode, Lembar: n, Harga: avg, Biaya: 0, Catatan: 'Pindah ke ' + ke},
+    {Tanggal: tgl, Jenis: 'Beli', Pemilik: ke, Kode: kode, Lembar: n, Harga: avg, Biaya: 0, Catatan: 'Pindah dari ' + dari}];
+  try { await api({action: 'addMany', sheet: 'Transaksi', rows}); closeForm(); toast(`${lot} lot ${kode} pindah ke ${ke}`); load(); } catch (e) { toast(e.message); }
 }
 
 // ---------- Impor laporan broker ----------
